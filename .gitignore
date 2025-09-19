@@ -163,7 +163,7 @@ config/staging.yml
 dump.rdb
 
 # Docker
-.dockerignore
+# .dockerignore (we want to track this file)
 
 # Kubernetes
 *.kubeconfig
@@ -182,10 +182,10 @@ tmp/
 temp/
 .tmp/
 
-# Test files
-test_*.py
-*_test.py
-tests/test_*.py
+# Test files (but keep our actual test files)
+# test_*.py
+# *_test.py
+# tests/test_*.py
 
 # Documentation build
 docs/build/
