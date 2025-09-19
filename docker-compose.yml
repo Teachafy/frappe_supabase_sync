@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  sync-service:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - FRAPPE_URL=${FRAPPE_URL}
+      - FRAPPE_API_KEY=${FRAPPE_API_KEY}
+      - FRAPPE_API_SECRET=${FRAPPE_API_SECRET}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - REDIS_URL=redis://redis:6379/0
+      - WEBHOOK_SECRET_KEY=${WEBHOOK_SECRET_KEY}
+      - FRAPPE_WEBHOOK_TOKEN=${FRAPPE_WEBHOOK_TOKEN}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENABLE_METRICS=${ENABLE_METRICS:-true}
+    depends_on:
+      - redis
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Optional: PostgreSQL for sync state tracking
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=sync_db
+      - POSTGRES_USER=sync_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-sync_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Optional: Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  # Optional: Grafana for monitoring dashboard
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
+  prometheus_data:
+  grafana_data:

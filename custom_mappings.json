@@ -1,0 +1,194 @@
+{
+  "tasks_Task": {
+    "frappe_doctype": "Task",
+    "supabase_table": "tasks",
+    "primary_key": "name",
+    "sync_fields": ["name", "subject", "status", "project", "act_start_date", "act_end_date", "type", "description", "progress", "is_milestone", "creation", "modified", "owner", "_assign"],
+    "field_mappings": {
+      "name": "id",
+      "subject": "task_name",
+      "status": "status",
+      "project": "project",
+      "act_start_date": "start_date",
+      "act_end_date": "end_date",
+      "type": "task_category",
+      "description": "page_content",
+      "progress": "progress",
+      "is_milestone": "needs_submission",
+      "creation": "created_at",
+      "modified": "updated_at",
+      "owner": "created_by",
+      "_assign": "assigned_to"
+    },
+    "reverse_mappings": {
+      "id": "name",
+      "task_name": "subject",
+      "status": "status",
+      "project": "project",
+      "start_date": "act_start_date",
+      "end_date": "act_end_date",
+      "task_category": "type",
+      "page_content": "description",
+      "progress": "progress",
+      "needs_submission": "is_milestone",
+      "created_at": "creation",
+      "updated_at": "modified",
+      "created_by": "owner",
+      "assigned_to": "_assign"
+    },
+    "direction": "bidirectional",
+    "conflict_resolution": "last_modified_wins",
+    "complex_mappings": {
+      "project": {
+        "type": "lookup",
+        "supabase_table": "projects",
+        "frappe_doctype": "Project",
+        "supabase_field": "id",
+        "frappe_field": "name",
+        "prefix_logic": "PROJ-0XX"
+      },
+      "type": {
+        "type": "lookup",
+        "frappe_doctype": "Task Type",
+        "supabase_field": "task_category",
+        "frappe_field": "name"
+      },
+      "_assign": {
+        "type": "array_to_uuid",
+        "description": "Convert Frappe assignment array to Supabase assigned_to UUID array"
+      },
+      "is_milestone": {
+        "type": "boolean_mapping",
+        "description": "Map Frappe is_milestone boolean to Supabase needs_submission boolean"
+      }
+    },
+    "confidence_score": 0.95,
+    "created_at": "2025-01-27T00:00:00Z"
+  },
+  "users_Employee": {
+    "frappe_doctype": "Employee",
+    "supabase_table": "users",
+    "primary_key": "name",
+    "sync_fields": ["name", "first_name", "last_name", "employee", "cell_number", "personal_email", "company_email", "preferred_contact_email", "company", "status", "designation", "department", "user_id", "creation", "modified"],
+    "field_mappings": {
+      "name": "id",
+      "first_name": "first_name",
+      "last_name": "last_name",
+      "employee": "name",
+      "cell_number": "phone_number",
+      "personal_email": "email",
+      "company_email": "email",
+      "preferred_contact_email": "email",
+      "company": "organization",
+      "status": "verified",
+      "designation": "designation",
+      "department": "department",
+      "user_id": "created_by",
+      "creation": "created_at",
+      "modified": "updated_at"
+    },
+    "reverse_mappings": {
+      "id": "name",
+      "first_name": "first_name",
+      "last_name": "last_name",
+      "name": "employee",
+      "phone_number": "cell_number",
+      "email": "personal_email",
+      "organization": "company",
+      "verified": "status",
+      "designation": "designation",
+      "department": "department",
+      "created_by": "user_id",
+      "created_at": "creation",
+      "updated_at": "modified"
+    },
+    "direction": "bidirectional",
+    "conflict_resolution": "last_modified_wins",
+    "email_priority": ["personal_email", "company_email", "preferred_contact_email"],
+    "complex_mappings": {
+      "name": {
+        "type": "employee_id",
+        "description": "Map Supabase name to Frappe employee name (HR-EMP-XXX format)"
+      },
+      "email": {
+        "type": "email_priority",
+        "description": "Use preferred_contact_email if available, otherwise personal_email, fallback to company_email"
+      },
+      "verified": {
+        "type": "status_mapping",
+        "description": "Map Frappe status (Active/Inactive) to Supabase verified boolean"
+      },
+      "organization": {
+        "type": "lookup",
+        "supabase_table": "organizations",
+        "frappe_doctype": "Company",
+        "supabase_field": "id",
+        "frappe_field": "name"
+      }
+    },
+    "confidence_score": 0.90,
+    "created_at": "2025-01-27T00:00:00Z"
+  },
+  "training_events_Training_Event": {
+    "frappe_doctype": "Training Event",
+    "supabase_table": "training_events",
+    "primary_key": "name",
+    "sync_fields": ["name", "event_name", "event_type", "start_time", "end_time", "status", "description", "location", "instructor", "max_participants", "participants", "company", "creation", "modified", "owner"],
+    "field_mappings": {
+      "name": "id",
+      "event_name": "event_title",
+      "event_type": "event_type",
+      "start_time": "start_date",
+      "end_time": "end_date",
+      "status": "status",
+      "description": "description",
+      "location": "location",
+      "instructor": "instructor",
+      "max_participants": "max_participants",
+      "participants": "participants",
+      "company": "organization_id",
+      "creation": "created_at",
+      "modified": "updated_at",
+      "owner": "created_by"
+    },
+    "reverse_mappings": {
+      "id": "name",
+      "event_title": "event_name",
+      "event_type": "event_type",
+      "start_date": "start_time",
+      "end_date": "end_time",
+      "status": "status",
+      "description": "description",
+      "location": "location",
+      "instructor": "instructor",
+      "max_participants": "max_participants",
+      "participants": "participants",
+      "organization_id": "company",
+      "created_at": "creation",
+      "updated_at": "modified",
+      "created_by": "owner"
+    },
+    "direction": "bidirectional",
+    "conflict_resolution": "last_modified_wins",
+    "complex_mappings": {
+      "participants": {
+        "type": "array_mapping",
+        "description": "Map Frappe participants list to Supabase participants array"
+      },
+      "instructor": {
+        "type": "lookup",
+        "frappe_doctype": "Employee",
+        "supabase_field": "instructor",
+        "frappe_field": "name"
+      },
+      "company": {
+        "type": "lookup",
+        "frappe_doctype": "Company",
+        "supabase_field": "organization_id",
+        "frappe_field": "name"
+      }
+    },
+    "confidence_score": 0.85,
+    "created_at": "2025-01-27T00:00:00Z"
+  }
+}

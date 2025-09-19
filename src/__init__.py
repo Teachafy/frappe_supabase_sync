@@ -1,0 +1,1 @@
+# Frappe-Supabase Sync Service
