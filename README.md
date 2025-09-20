@@ -22,6 +22,40 @@ Frappe Webhook → Sync Engine → Field Mapper → Supabase
      ←─── Conflict Resolution ←─── Sync Engine ←─── Supabase Webhook
 ```
 
+## 📁 **Project Structure**
+
+```
+frappe_supabase_sync/
+├── src/                          # Core source code
+│   ├── api/                      # API endpoints
+│   ├── discovery/                # Schema discovery
+│   ├── engine/                   # Sync engine core
+│   ├── handlers/                 # Webhook handlers
+│   ├── mapping/                  # Field mapping logic
+│   ├── monitoring/               # Health & metrics
+│   ├── queue/                    # Queue management
+│   └── utils/                    # Utility functions
+├── scripts/                      # Utility scripts (organized by function)
+│   ├── debugging/                # Debug and check scripts
+│   ├── schema-discovery/         # Schema analysis scripts
+│   ├── setup/                    # Setup and configuration scripts
+│   ├── testing/                  # Test runners and test fixes
+│   └── verification/             # System verification scripts
+├── tests/                        # Test suite
+│   ├── test_*.py                 # Individual test files
+│   └── conftest.py               # Pytest configuration
+├── docs/                         # Documentation
+├── config/                       # Configuration files
+└── main.py                       # Application entry point
+```
+
+### **Script Organization Guidelines**
+- **`scripts/debugging/`**: Debug and diagnostic scripts
+- **`scripts/schema-discovery/`**: Schema analysis and discovery
+- **`scripts/setup/`**: Initial setup and configuration
+- **`scripts/testing/`**: Test runners and test utilities
+- **`scripts/verification/`**: System verification and validation
+
 ## 🚀 **Quick Start**
 
 ### **Prerequisites**

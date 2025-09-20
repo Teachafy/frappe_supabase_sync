@@ -106,7 +106,7 @@ async def get_metrics():
         raise HTTPException(status_code=500, detail="Failed to get metrics")
 
 
-@app.post("/webhook/frappe")
+@app.post("/webhooks/frappe")
 async def frappe_webhook(request: Request, background_tasks: BackgroundTasks):
     """Frappe webhook endpoint"""
     try:
@@ -123,11 +123,11 @@ async def frappe_webhook(request: Request, background_tasks: BackgroundTasks):
         return result
         
     except Exception as e:
-        logger.error("Frappe webhook processing failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Frappe webhook processing failed", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Frappe webhook processing failed: {str(e)}")
 
 
-@app.post("/webhook/supabase")
+@app.post("/webhooks/supabase")
 async def supabase_webhook(request: Request, background_tasks: BackgroundTasks):
     """Supabase webhook endpoint"""
     try:
@@ -144,8 +144,8 @@ async def supabase_webhook(request: Request, background_tasks: BackgroundTasks):
         return result
         
     except Exception as e:
-        logger.error("Supabase webhook processing failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Supabase webhook processing failed", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Supabase webhook processing failed: {str(e)}")
 
 
 @app.get("/sync/status")

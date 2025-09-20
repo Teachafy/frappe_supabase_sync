@@ -40,3 +40,4 @@ safety>=2.3.0
 # Database Testing
 pytest-postgresql>=4.1.0
 pytest-redis>=3.0.0
+

@@ -108,6 +108,32 @@ class Settings(BaseSettings):
     max_concurrent_syncs: int = Field(default=10, env="MAX_CONCURRENT_SYNCS")
     sync_timeout: int = Field(default=300, env="SYNC_TIMEOUT")
     
+    # Webhook Deduplication
+    webhook_deduplication_timeout: int = Field(default=500, env="WEBHOOK_DEDUPLICATION_TIMEOUT")
+    enable_webhook_deduplication: bool = Field(default=True, env="ENABLE_WEBHOOK_DEDUPLICATION")
+    
+    def get_sync_mapping(self, doctype: str) -> Optional[Dict[str, Any]]:
+        """Get sync mapping configuration for a doctype"""
+        # First try to load from custom_mappings.json
+        try:
+            import json
+            from pathlib import Path
+            
+            custom_mappings_file = Path("custom_mappings.json")
+            if custom_mappings_file.exists():
+                with open(custom_mappings_file, 'r') as f:
+                    custom_mappings = json.load(f)
+                
+                # Look for mapping with this doctype
+                for mapping_key, mapping_config in custom_mappings.items():
+                    if mapping_config.get("frappe_doctype") == doctype:
+                        return mapping_config
+        except Exception as e:
+            print(f"Warning: Could not load custom mappings: {e}")
+        
+        # Fallback to default mappings
+        return self.sync_mappings.get(doctype)
+    
     class Config:
         env_file = ".env"
         case_sensitive = False

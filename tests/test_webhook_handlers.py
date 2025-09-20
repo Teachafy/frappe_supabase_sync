@@ -3,6 +3,7 @@ Comprehensive tests for webhook handlers
 """
 import pytest
 import json
+import asyncio
 from unittest.mock import Mock, AsyncMock, patch
 from fastapi import Request, HTTPException
 
@@ -291,11 +292,11 @@ class TestSupabaseWebhookHandler:
         with patch.object(supabase_webhook_handler.sync_engine, 'load_sync_mappings', 
                          return_value=custom_mappings):
             
-            mapping = await supabase_webhook_handler._find_mapping_by_table("users")
+            mapping = supabase_webhook_handler._find_mapping_by_table("users")
             assert mapping is not None
             assert mapping["supabase_table"] == "users"
             
-            mapping = await supabase_webhook_handler._find_mapping_by_table("nonexistent")
+            mapping = supabase_webhook_handler._find_mapping_by_table("nonexistent")
             assert mapping is None
 
     @pytest.mark.asyncio
@@ -401,7 +402,7 @@ class TestWebhookIntegration:
         
         with patch.object(frappe_webhook_handler, 'verify_webhook_signature', return_value=True), \
              patch.object(frappe_webhook_handler.sync_engine, 'process_sync_event', 
-                         side_effect=failing_then_success()):
+                         side_effect=failing_then_success):
             
             with pytest.raises(HTTPException):
                 await frappe_webhook_handler.process_webhook(request, payload)

@@ -193,7 +193,8 @@ def sync_engine(test_settings, mock_frappe_client, mock_supabase_client, mock_re
     """Sync engine with mocked dependencies"""
     with patch('src.engine.sync_engine.FrappeClient', return_value=mock_frappe_client), \
          patch('src.engine.sync_engine.SupabaseClient', return_value=mock_supabase_client), \
-         patch('src.engine.sync_engine.Redis', return_value=mock_redis_client):
+         patch('src.queue.sync_queue.redis.from_url', return_value=mock_redis_client), \
+         patch('src.engine.sync_engine.settings', test_settings):
         return SyncEngine()
 
 

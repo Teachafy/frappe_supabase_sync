@@ -42,6 +42,7 @@ class SyncEvent(BaseModel):
     data: Dict[str, Any] = Field(..., description="Record data")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     webhook_id: Optional[str] = Field(None, description="Webhook ID for tracking")
+    original_source: Optional[str] = Field(None, description="Original source to prevent reverse sync loops")
 
 
 class SyncOperation(BaseModel):
@@ -122,19 +123,50 @@ class WebhookPayload(BaseModel):
     source: str = Field(..., description="Source system")
 
 
-class FrappeWebhookPayload(WebhookPayload):
+class FrappeWebhookPayload(BaseModel):
     """Frappe-specific webhook payload"""
     doctype: str = Field(..., description="Frappe doctype")
     name: str = Field(..., description="Document name")
     operation: str = Field(..., description="Operation (after_insert/after_update/after_delete)")
     doc: Dict[str, Any] = Field(..., description="Document data")
     source: str = Field(default="frappe")
+    
+    @property
+    def event_type(self) -> str:
+        """Get event type from operation"""
+        return self.operation
+    
+    @property
+    def data(self) -> Dict[str, Any]:
+        """Get data from doc"""
+        return self.doc
 
 
-class SupabaseWebhookPayload(WebhookPayload):
+class SupabaseWebhookPayload(BaseModel):
     """Supabase-specific webhook payload"""
+    type: str = Field(..., description="Operation type (INSERT/UPDATE/DELETE)")
     table: str = Field(..., description="Supabase table name")
     record: Dict[str, Any] = Field(..., description="Record data")
     old_record: Optional[Dict[str, Any]] = Field(None, description="Old record data")
-    operation: str = Field(..., description="Operation (INSERT/UPDATE/DELETE)")
+    db_schema: Optional[str] = Field(None, description="Database schema", alias="schema")
     source: str = Field(default="supabase")
+    
+    @property
+    def operation(self) -> str:
+        """Get operation from type"""
+        return self.type
+    
+    @property
+    def event_type(self) -> str:
+        """Get event type from operation"""
+        return self.type
+    
+    @property
+    def doctype(self) -> str:
+        """Get doctype from table"""
+        return self.table
+    
+    @property
+    def data(self) -> Dict[str, Any]:
+        """Get data from record"""
+        return self.record

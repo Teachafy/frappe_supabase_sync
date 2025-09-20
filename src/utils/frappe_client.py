@@ -58,9 +58,11 @@ class FrappeClient:
         try:
             params = {}
             if filters:
-                params["filters"] = str(filters)
+                import json
+                params["filters"] = json.dumps(filters)
             if fields:
-                params["fields"] = str(fields)
+                import json
+                params["fields"] = json.dumps(fields)
             params["limit_page_length"] = limit
             
             async with httpx.AsyncClient() as client:
@@ -93,7 +95,15 @@ class FrappeClient:
                 response.raise_for_status()
                 return response.json()["data"]
         except Exception as e:
-            logger.error("Failed to create document", doctype=doctype, data=data, error=str(e))
+            # Log response body for debugging
+            try:
+                if hasattr(e, 'response') and e.response:
+                    response_body = e.response.text
+                    logger.error("Failed to create document", doctype=doctype, data=data, error=str(e), response_body=response_body)
+                else:
+                    logger.error("Failed to create document", doctype=doctype, data=data, error=str(e))
+            except:
+                logger.error("Failed to create document", doctype=doctype, data=data, error=str(e))
             raise
     
     @retry(
@@ -155,6 +165,31 @@ class FrappeClient:
         except Exception as e:
             logger.error("Failed to search documents", doctype=doctype, search_term=search_term, error=str(e))
             raise
+    
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
+    async def find_document_by_field(self, doctype: str, field: str, value: str) -> Optional[Dict[str, Any]]:
+        """Find a document by a specific field value"""
+        try:
+            async with httpx.AsyncClient() as client:
+                params = {
+                    "filters": f'[["{field}", "=", "{value}"]]',
+                    "limit_page_length": 1
+                }
+                response = await client.get(
+                    f"{self.base_url}/api/resource/{doctype}",
+                    headers=self.headers,
+                    params=params,
+                    timeout=30.0
+                )
+                response.raise_for_status()
+                data = response.json()["data"]
+                return data[0] if data else None
+        except Exception as e:
+            logger.error("Failed to find document by field", doctype=doctype, field=field, value=value, error=str(e))
+            return None
     
     async def get_doctype_meta(self, doctype: str) -> Dict[str, Any]:
         """Get doctype metadata from Frappe"""

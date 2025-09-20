@@ -25,6 +25,62 @@ class SchemaDiscovery:
         self.schema_cache = {}
         self.cache_ttl = settings.schema_cache_ttl
         
+    async def discover_frappe_doctypes(self) -> Dict[str, Any]:
+        """Discover Frappe doctypes and their fields"""
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{settings.frappe_url}/api/method/frappe.desk.form.load.getdoctype",
+                    params={"doctype": "Employee"}  # Example doctype
+                )
+                if response.status_code == 200:
+                    data = await response.json()
+                    docs = data.get("docs", [])
+                    return {doc.get("name", f"doctype_{i}"): doc for i, doc in enumerate(docs)}
+                return {}
+        except Exception as e:
+            logger.error(f"Failed to discover Frappe doctypes: {e}")
+            return {}
+    
+    async def discover_supabase_tables(self) -> Dict[str, Any]:
+        """Discover Supabase tables and their columns"""
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{settings.supabase_url}/rest/v1/rpc/get_all_tables",
+                    headers={"Authorization": f"Bearer {settings.supabase_service_role_key}"}
+                )
+                if response.status_code == 200:
+                    data = await response.json()
+                    return {table["table_name"]: table for table in data}
+                return {}
+        except Exception as e:
+            logger.error(f"Failed to discover Supabase tables: {e}")
+            return {}
+    
+    async def discover_event_related_doctypes(self) -> Dict[str, List[str]]:
+        """Discover event-related doctypes in both systems"""
+        frappe_doctypes = await self.discover_frappe_doctypes()
+        supabase_tables = await self.discover_supabase_tables()
+        
+        event_related = {
+            "frappe": [],
+            "supabase": []
+        }
+        
+        # Look for event-related patterns
+        for doctype_name in frappe_doctypes.keys():
+            if "event" in doctype_name.lower() or "training" in doctype_name.lower():
+                event_related["frappe"].append(doctype_name)
+        
+        for table_name in supabase_tables.keys():
+            if "event" in table_name.lower() or "training" in table_name.lower():
+                event_related["supabase"].append(table_name)
+        
+        return event_related
+    
     async def discover_all_schemas(self) -> Dict[str, Any]:
         """Discover schemas from both systems and create mappings"""
         try:

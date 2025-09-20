@@ -386,7 +386,7 @@ class TestComplexMapper:
         frappe_assign = ["user1", "user2", "user3"]
         
         result = await complex_mapper._handle_array_mapping(
-            frappe_assign, "frappe_to_supabase"
+            frappe_assign, {}, "frappe_to_supabase"
         )
         
         assert result is not None
@@ -410,7 +410,7 @@ class TestComplexMapper:
         
         for input_val, expected in test_cases:
             result = await complex_mapper._handle_boolean_mapping(
-                input_val, "frappe_to_supabase"
+                input_val, {}, "frappe_to_supabase"
             )
             assert result == expected
 
@@ -427,7 +427,7 @@ class TestComplexMapper:
         
         for dt_string in test_cases:
             result = await complex_mapper._handle_datetime_mapping(
-                dt_string, "frappe_to_supabase"
+                dt_string, {}, "frappe_to_supabase"
             )
             assert result is not None
             assert isinstance(result, str)
@@ -461,7 +461,7 @@ class TestComplexMapper:
         data = {"test": "value"}
         
         result = await complex_mapper._handle_complex_mapping(
-            data, invalid_config, "frappe_to_supabase"
+            "test_field", data, invalid_config, "frappe_to_supabase"
         )
         
         # Should handle error gracefully

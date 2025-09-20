@@ -3,63 +3,61 @@
     "frappe_doctype": "Task",
     "supabase_table": "tasks",
     "primary_key": "name",
-    "sync_fields": ["name", "subject", "status", "project", "act_start_date", "act_end_date", "type", "description", "progress", "is_milestone", "creation", "modified", "owner", "_assign"],
+    "sync_fields": ["subject", "status", "act_start_date", "act_end_date", "exp_start_date", "exp_end_date", "is_milestone", "creation", "modified", "priority", "description", "organization_id"],
     "field_mappings": {
-      "name": "id",
       "subject": "task_name",
       "status": "status",
-      "project": "project",
       "act_start_date": "start_date",
       "act_end_date": "end_date",
-      "type": "task_category",
-      "description": "page_content",
-      "progress": "progress",
       "is_milestone": "needs_submission",
       "creation": "created_at",
       "modified": "updated_at",
-      "owner": "created_by",
-      "_assign": "assigned_to"
+      "description": "page_content",
+      "organization_id": "organization_id"
     },
     "reverse_mappings": {
-      "id": "name",
       "task_name": "subject",
       "status": "status",
-      "project": "project",
       "start_date": "act_start_date",
       "end_date": "act_end_date",
-      "task_category": "type",
-      "page_content": "description",
-      "progress": "progress",
       "needs_submission": "is_milestone",
       "created_at": "creation",
       "updated_at": "modified",
-      "created_by": "owner",
-      "assigned_to": "_assign"
+      "page_content": "description"
+    },
+    "reverse_complex_mappings": {
+      "start_date": {
+        "type": "date_format_conversion",
+        "description": "Convert ISO datetime to date string for Frappe",
+        "input_format": "iso_datetime",
+        "output_format": "date_string"
+      },
+      "end_date": {
+        "type": "date_format_conversion",
+        "description": "Convert ISO datetime to date string for Frappe",
+        "input_format": "iso_datetime",
+        "output_format": "date_string"
+      }
     },
     "direction": "bidirectional",
     "conflict_resolution": "last_modified_wins",
     "complex_mappings": {
-      "project": {
-        "type": "lookup",
-        "supabase_table": "projects",
-        "frappe_doctype": "Project",
-        "supabase_field": "id",
-        "frappe_field": "name",
-        "prefix_logic": "PROJ-0XX"
+      "act_start_date": {
+        "type": "date_fallback",
+        "description": "Use act_start_date if available, otherwise exp_start_date",
+        "primary_field": "act_start_date",
+        "fallback_field": "exp_start_date"
       },
-      "type": {
-        "type": "lookup",
-        "frappe_doctype": "Task Type",
-        "supabase_field": "task_category",
-        "frappe_field": "name"
+      "act_end_date": {
+        "type": "date_fallback", 
+        "description": "Use act_end_date if available, otherwise exp_end_date",
+        "primary_field": "act_end_date",
+        "fallback_field": "exp_end_date"
       },
-      "_assign": {
-        "type": "array_to_uuid",
-        "description": "Convert Frappe assignment array to Supabase assigned_to UUID array"
-      },
-      "is_milestone": {
-        "type": "boolean_mapping",
-        "description": "Map Frappe is_milestone boolean to Supabase needs_submission boolean"
+      "organization_id": {
+        "type": "default_value",
+        "value": "466a07d9-6f3d-462a-be75-f4cd8691b9bf",
+        "description": "Default organization ID for tasks (Test Organization)"
       }
     },
     "confidence_score": 0.95,
@@ -69,64 +67,137 @@
     "frappe_doctype": "Employee",
     "supabase_table": "users",
     "primary_key": "name",
-    "sync_fields": ["name", "first_name", "last_name", "employee", "cell_number", "personal_email", "company_email", "preferred_contact_email", "company", "status", "designation", "department", "user_id", "creation", "modified"],
+    "sync_fields": ["first_name", "last_name", "personal_email", "cell_number", "status", "company"],
     "field_mappings": {
-      "name": "id",
-      "first_name": "first_name",
-      "last_name": "last_name",
-      "employee": "name",
-      "cell_number": "phone_number",
+      "name": "name",
       "personal_email": "email",
-      "company_email": "email",
-      "preferred_contact_email": "email",
-      "company": "organization",
-      "status": "verified",
-      "designation": "designation",
-      "department": "department",
-      "user_id": "created_by",
-      "creation": "created_at",
-      "modified": "updated_at"
+      "cell_number": "phone_number",
+      "status": "_legacy_is_active",
+      "company": "organization_id"
     },
     "reverse_mappings": {
-      "id": "name",
-      "first_name": "first_name",
-      "last_name": "last_name",
-      "name": "employee",
-      "phone_number": "cell_number",
+      "name": "first_name",
       "email": "personal_email",
-      "organization": "company",
-      "verified": "status",
-      "designation": "designation",
-      "department": "department",
-      "created_by": "user_id",
-      "created_at": "creation",
-      "updated_at": "modified"
+      "phone_number": "cell_number",
+      "_legacy_is_active": "status",
+      "organization_id": "company",
+      "last_name": "last_name",
+      "gender": "gender",
+      "date_of_birth": "date_of_birth",
+      "date_of_joining": "date_of_joining"
     },
     "direction": "bidirectional",
     "conflict_resolution": "last_modified_wins",
-    "email_priority": ["personal_email", "company_email", "preferred_contact_email"],
     "complex_mappings": {
       "name": {
-        "type": "employee_id",
-        "description": "Map Supabase name to Frappe employee name (HR-EMP-XXX format)"
+        "type": "name_combination",
+        "description": "Combine first_name and last_name for Supabase name field"
+      },
+      "first_name": {
+        "type": "reverse_name_combination",
+        "description": "Split Supabase name field into first_name and last_name for Frappe"
       },
       "email": {
         "type": "email_priority",
-        "description": "Use preferred_contact_email if available, otherwise personal_email, fallback to company_email"
+        "email_priority": ["personal_email", "prefered_email"],
+        "description": "Use personal_email if available, otherwise prefered_email"
       },
-      "verified": {
+      "status": {
         "type": "status_mapping",
-        "description": "Map Frappe status (Active/Inactive) to Supabase verified boolean"
+        "active_status": "Active",
+        "inactive_status": "Inactive",
+        "default_status": "Active",
+        "description": "Map Frappe status to Supabase _legacy_is_active boolean"
       },
-      "organization": {
-        "type": "lookup",
-        "supabase_table": "organizations",
-        "frappe_doctype": "Company",
-        "supabase_field": "id",
-        "frappe_field": "name"
+      "company": {
+        "type": "company_to_org_mapping",
+        "description": "Map Frappe company name to Supabase organization_id",
+        "mappings": {
+          "Stonemart Building Solutions": "dd9d4bc8-6aca-4ca6-b9a2-c2882dbb22f",
+          "Teachafy Technologies Private Limited": "0ca0f05e-5e57-44cb-a14c-89ff1d095889"
+        }
       }
     },
-    "confidence_score": 0.90,
+    "reverse_complex_mappings": {
+      "first_name": {
+        "type": "reverse_name_combination",
+        "description": "Split Supabase name field into first_name and last_name for Frappe"
+      },
+      "email": {
+        "type": "email_priority",
+        "email_priority": ["personal_email", "prefered_email"],
+        "description": "Use personal_email if available, otherwise prefered_email"
+      },
+      "_legacy_is_active": {
+        "type": "status_mapping",
+        "active_status": "Active",
+        "inactive_status": "Inactive",
+        "default_status": "Active",
+        "description": "Map Supabase _legacy_is_active boolean to Frappe status"
+      },
+      "organization_id": {
+        "type": "company_to_org_mapping",
+        "description": "Map Supabase organization_id to Frappe company name",
+        "mappings": {
+          "dd9d4bc8-6aca-4ca6-b9a2-c2882dbb22f": "Stonemart Building Solutions",
+          "0ca0f05e-5e57-44cb-a14c-89ff1d095889": "Teachafy Technologies Private Limited"
+        }
+      },
+      "gender": {
+        "type": "default_value",
+        "value": "Male",
+        "description": "Default gender for Supabase to Frappe sync"
+      },
+      "date_of_birth": {
+        "type": "default_value",
+        "value": "1990-01-01",
+        "description": "Default date of birth for Supabase to Frappe sync"
+      },
+      "date_of_joining": {
+        "type": "default_value",
+        "value": "2025-01-01",
+        "description": "Default date of joining for Supabase to Frappe sync"
+      }
+    },
+    "confidence_score": 0.95,
+    "created_at": "2025-01-27T00:00:00Z"
+  },
+  "projects_Project": {
+    "frappe_doctype": "Project",
+    "supabase_table": "projects",
+    "primary_key": "name",
+    "sync_fields": ["name", "project_name", "status", "is_active", "company", "priority", "percent_complete"],
+    "field_mappings": {
+      "name": "id",
+      "project_name": "name",
+      "status": "status",
+      "is_active": "is_active",
+      "company": "organization_id",
+      "priority": "priority",
+      "percent_complete": "progress"
+    },
+    "reverse_mappings": {
+      "id": "name",
+      "name": "project_name",
+      "status": "status",
+      "is_active": "is_active",
+      "organization_id": "company",
+      "priority": "priority",
+      "progress": "percent_complete"
+    },
+    "direction": "bidirectional",
+    "conflict_resolution": "last_modified_wins",
+    "complex_mappings": {
+      "organization_id": {
+        "type": "company_to_org_mapping",
+        "description": "Map Frappe company name to Supabase organization_id",
+        "mappings": {
+          "Stonemart Building Solutions": "dd9d4bc8-6aca-4ca6-b9a2-c2882dbb22f",
+          "Teachafy Technologies Private Limited": "0ca0f05e-5e57-44cb-a14c-89ff1d095889"
+        }
+      }
+    },
+    "confidence_score": 0.95,
     "created_at": "2025-01-27T00:00:00Z"
   },
   "training_events_Training_Event": {

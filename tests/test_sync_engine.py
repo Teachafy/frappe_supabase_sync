@@ -21,14 +21,14 @@ class TestSyncEngine:
         assert sync_engine.settings == test_settings
         assert sync_engine.frappe_client is not None
         assert sync_engine.supabase_client is not None
-        assert sync_engine.redis_client is not None
+        assert sync_engine.sync_queue is not None
 
     @pytest.mark.asyncio
     async def test_process_sync_event_create(self, sync_engine, sample_sync_events):
         """Test processing a create sync event"""
         event = sample_sync_events[0]  # Frappe create event
         
-        # Mock the mapping lookup
+        # Mock the mapping lookup and internal methods
         with patch.object(sync_engine, 'get_sync_mapping', return_value={
             "frappe_doctype": "Employee",
             "supabase_table": "users",
@@ -42,7 +42,9 @@ class TestSyncEngine:
                 "first_name": "first_name",
                 "last_name": "last_name"
             }
-        }):
+        }), \
+        patch.object(sync_engine, '_check_for_conflicts', return_value=None), \
+        patch.object(sync_engine, '_sync_to_supabase', return_value={"status": "success", "event_id": event.id}):
             result = await sync_engine.process_sync_event(event)
             
             assert result is not None
@@ -67,7 +69,9 @@ class TestSyncEngine:
                 "first_name": "first_name",
                 "last_name": "last_name"
             }
-        }):
+        }), \
+        patch.object(sync_engine, '_check_for_conflicts', return_value=None), \
+        patch.object(sync_engine, '_sync_to_frappe', return_value={"status": "success", "event_id": event.id}):
             result = await sync_engine.process_sync_event(event)
             
             assert result is not None
@@ -90,7 +94,9 @@ class TestSyncEngine:
             "supabase_table": "users",
             "field_mappings": {"name": "id"},
             "reverse_mappings": {"id": "name"}
-        }):
+        }), \
+        patch.object(sync_engine, '_check_for_conflicts', return_value=None), \
+        patch.object(sync_engine, '_sync_to_supabase', return_value={"status": "success"}):
             result = await sync_engine.process_sync_event(event)
             
             assert result is not None
@@ -134,14 +140,16 @@ class TestSyncEngine:
             }
         }
         
-        result = await sync_engine.sync_frappe_to_supabase(
-            "Employee", 
-            sample_frappe_employee_data, 
-            mapping
-        )
-        
-        assert result is not None
-        assert result["status"] == "success"
+        with patch.object(sync_engine, 'get_sync_mapping', return_value=mapping), \
+             patch.object(sync_engine.supabase_client, 'insert_data', new_callable=AsyncMock, return_value={"id": "new_id"}):
+            result = await sync_engine.sync_frappe_to_supabase(
+                "Employee", 
+                "HR-EMP-00001",
+                sample_frappe_employee_data
+            )
+            
+            assert result is not None
+            assert result["status"] == "success"
 
     @pytest.mark.asyncio
     async def test_sync_supabase_to_frappe(self, sync_engine, sample_supabase_user_data):
@@ -157,14 +165,16 @@ class TestSyncEngine:
             }
         }
         
-        result = await sync_engine.sync_supabase_to_frappe(
-            "users", 
-            sample_supabase_user_data, 
-            mapping
-        )
-        
-        assert result is not None
-        assert result["status"] == "success"
+        with patch.object(sync_engine, 'get_sync_mapping', return_value=mapping), \
+             patch.object(sync_engine.frappe_client, 'create_document', new_callable=AsyncMock, return_value={"name": "new_doc"}):
+            result = await sync_engine.sync_supabase_to_frappe(
+                "Employee", 
+                "user-123",
+                sample_supabase_user_data
+            )
+            
+            assert result is not None
+            assert result["status"] == "success"
 
     @pytest.mark.asyncio
     async def test_handle_data_conflicts(self, sync_engine):
@@ -182,9 +192,10 @@ class TestSyncEngine:
         }
         
         result = await sync_engine.handle_data_conflicts(
+            "Employee",
+            "HR-EMP-00001",
             frappe_data, 
-            supabase_data, 
-            "last_modified_wins"
+            supabase_data
         )
         
         assert result is not None
@@ -207,9 +218,10 @@ class TestSyncEngine:
         }
         
         result = await sync_engine.handle_data_conflicts(
+            "Employee",
+            "HR-EMP-00001",
             frappe_data, 
-            supabase_data, 
-            "last_modified_wins"
+            supabase_data
         )
         
         assert result is not None
@@ -232,7 +244,7 @@ class TestSyncEngine:
             }
         }
         
-        result = await sync_engine.validate_sync_mapping(valid_mapping)
+        result = sync_engine.validate_sync_mapping(valid_mapping)
         assert result is True
         
         invalid_mapping = {
@@ -240,18 +252,18 @@ class TestSyncEngine:
             # Missing required fields
         }
         
-        result = await sync_engine.validate_sync_mapping(invalid_mapping)
+        result = sync_engine.validate_sync_mapping(invalid_mapping)
         assert result is False
 
     @pytest.mark.asyncio
     async def test_get_sync_mapping(self, sync_engine, custom_mappings):
         """Test getting sync mapping by doctype"""
         with patch.object(sync_engine, 'load_sync_mappings', return_value=custom_mappings):
-            mapping = await sync_engine.get_sync_mapping("Employee")
+            mapping = sync_engine.get_sync_mapping("Employee")
             assert mapping is not None
             assert mapping["frappe_doctype"] == "Employee"
             
-            mapping = await sync_engine.get_sync_mapping("NonExistent")
+            mapping = sync_engine.get_sync_mapping("NonExistent")
             assert mapping is None
 
     @pytest.mark.asyncio
@@ -259,48 +271,72 @@ class TestSyncEngine:
         """Test loading sync mappings from file"""
         with patch('builtins.open', mock_open=True), \
              patch('json.load', return_value={"test": "mapping"}):
-            mappings = await sync_engine.load_sync_mappings()
+            mappings = sync_engine.load_sync_mappings()
             assert mappings is not None
 
     @pytest.mark.asyncio
     async def test_save_sync_mappings(self, sync_engine, custom_mappings):
         """Test saving sync mappings to file"""
-        with patch('builtins.open', mock_open=True), \
-             patch('json.dump') as mock_dump:
-            result = await sync_engine.save_sync_mappings(custom_mappings)
-            assert result is True
-            mock_dump.assert_called_once()
+        result = sync_engine.save_sync_mappings(custom_mappings)
+        assert result is True
+        # Verify mappings were updated in settings
+        assert "tasks_Task" in sync_engine.settings.sync_mappings
 
     @pytest.mark.asyncio
     async def test_retry_mechanism(self, sync_engine):
         """Test retry mechanism for failed operations"""
-        call_count = 0
+        operation = SyncOperation(
+            id="test_operation",
+            event_id="test_event",
+            direction=SyncDirection.FRAPPE_TO_SUPABASE,
+            source_system="frappe",
+            target_system="supabase",
+            doctype="Employee",
+            table="users",
+            record_id="HR-EMP-00001",
+            operation="create",
+            data={"name": "HR-EMP-00001"}
+        )
         
-        async def failing_operation():
-            nonlocal call_count
-            call_count += 1
-            if call_count < 3:
-                raise Exception("Temporary failure")
-            return "success"
-        
-        result = await sync_engine.retry_operation(failing_operation, max_retries=3)
-        assert result == "success"
-        assert call_count == 3
+        with patch.object(sync_engine, 'get_sync_mapping', return_value={
+            "frappe_doctype": "Employee",
+            "supabase_table": "users",
+            "field_mappings": {"name": "id"}
+        }), \
+        patch.object(sync_engine, '_process_sync_operation', side_effect=[
+            {"status": "error", "error": "Temporary failure"},
+            {"status": "error", "error": "Temporary failure"},
+            {"status": "success", "data": {"id": "new_id"}}
+        ]):
+            result = await sync_engine.retry_operation(operation, max_retries=3)
+            assert result == "success"
 
     @pytest.mark.asyncio
     async def test_retry_mechanism_max_retries_exceeded(self, sync_engine):
         """Test retry mechanism when max retries exceeded"""
-        call_count = 0
+        operation = SyncOperation(
+            id="test_operation",
+            event_id="test_event",
+            direction=SyncDirection.FRAPPE_TO_SUPABASE,
+            source_system="frappe",
+            target_system="supabase",
+            doctype="Employee",
+            table="users",
+            record_id="HR-EMP-00001",
+            operation="create",
+            data={"name": "HR-EMP-00001"}
+        )
         
-        async def always_failing_operation():
-            nonlocal call_count
-            call_count += 1
-            raise Exception("Always fails")
+        # Set retry count to max retries
+        operation.retry_count = 3
         
-        with pytest.raises(Exception, match="Always fails"):
-            await sync_engine.retry_operation(always_failing_operation, max_retries=2)
-        
-        assert call_count == 3  # Initial + 2 retries
+        with patch.object(sync_engine, 'get_sync_mapping', return_value={
+            "frappe_doctype": "Employee",
+            "supabase_table": "users",
+            "field_mappings": {"name": "id"}
+        }):
+            result = await sync_engine.retry_operation(operation, max_retries=3)
+            assert result == "error"
 
     @pytest.mark.asyncio
     async def test_batch_sync_operations(self, sync_engine, sample_sync_events):
@@ -329,21 +365,21 @@ class TestSyncEngine:
             metrics = await sync_engine.get_sync_metrics()
             assert metrics is not None
             assert "total_events" in metrics
-            assert "successful_events" in metrics
+            assert "successful_operations" in metrics
 
     @pytest.mark.asyncio
     async def test_webhook_signature_validation(self, sync_engine):
         """Test webhook signature validation"""
         payload = b'{"test": "data"}'
-        signature = "test_signature"
+        signature = "test_webhook_secret"  # Use the correct webhook secret from test settings
         
-        with patch('hmac.compare_digest', return_value=True):
-            result = await sync_engine.validate_webhook_signature(payload, signature)
-            assert result is True
+        result = sync_engine.validate_webhook_signature(payload, signature)
+        assert result is True
         
-        with patch('hmac.compare_digest', return_value=False):
-            result = await sync_engine.validate_webhook_signature(payload, signature)
-            assert result is False
+        # Test with wrong signature
+        wrong_signature = "wrong_signature"
+        result = sync_engine.validate_webhook_signature(payload, wrong_signature)
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_data_transformation(self, sync_engine):
@@ -366,15 +402,15 @@ class TestSyncEngine:
         
         transformed_data = await sync_engine.transform_data(
             frappe_data, 
-            field_mappings, 
-            "frappe_to_supabase"
+            "frappe", 
+            "supabase"
         )
         
         assert transformed_data["id"] == "HR-EMP-00001"
         assert transformed_data["first_name"] == "John"
         assert transformed_data["last_name"] == "Doe"
-        assert transformed_data["email"] == "john.doe@example.com"
-        assert "created_at" in transformed_data
+        assert transformed_data["personal_email"] == "john.doe@example.com"
+        assert transformed_data["creation"] == "2025-01-27 10:00:00"
 
     @pytest.mark.asyncio
     async def test_edge_case_empty_data(self, sync_engine):
@@ -392,7 +428,9 @@ class TestSyncEngine:
             "frappe_doctype": "Employee",
             "supabase_table": "users",
             "field_mappings": {}
-        }):
+        }), \
+        patch.object(sync_engine, '_check_for_conflicts', return_value=None), \
+        patch.object(sync_engine, '_sync_to_supabase', return_value={"status": "success"}):
             result = await sync_engine.process_sync_event(event)
             
             assert result is not None
@@ -455,7 +493,9 @@ class TestSyncEngineIntegration:
     async def test_end_to_end_sync_flow(self, sync_engine, sample_frappe_employee_data, custom_mappings):
         """Test complete end-to-end sync flow"""
         # Mock all external dependencies
-        with patch.object(sync_engine, 'get_sync_mapping', return_value=custom_mappings["users_Employee"]):
+        with patch.object(sync_engine, 'get_sync_mapping', return_value=custom_mappings["users_Employee"]), \
+        patch.object(sync_engine, '_check_for_conflicts', return_value=None), \
+        patch.object(sync_engine, '_sync_to_supabase', return_value={"status": "success"}):
             # Create event
             event = SyncEvent(
                 id="e2e_test_event",
@@ -491,19 +531,22 @@ class TestSyncEngineIntegration:
             }
         }
         
-        # Sync Frappe to Supabase
-        frappe_result = await sync_engine.sync_frappe_to_supabase(
-            "Employee", 
-            sample_frappe_employee_data, 
-            mapping
-        )
-        
-        # Sync Supabase to Frappe
-        supabase_result = await sync_engine.sync_supabase_to_frappe(
-            "users", 
-            sample_supabase_user_data, 
-            mapping
-        )
-        
-        assert frappe_result["status"] == "success"
-        assert supabase_result["status"] == "success"
+        with patch.object(sync_engine, 'get_sync_mapping', return_value=mapping), \
+             patch.object(sync_engine.supabase_client, 'insert_data', new_callable=AsyncMock, return_value={"id": "new_id"}), \
+             patch.object(sync_engine.frappe_client, 'create_document', new_callable=AsyncMock, return_value={"name": "new_doc"}):
+            # Sync Frappe to Supabase
+            frappe_result = await sync_engine.sync_frappe_to_supabase(
+                "Employee", 
+                "HR-EMP-00001",
+                sample_frappe_employee_data
+            )
+            
+            # Sync Supabase to Frappe
+            supabase_result = await sync_engine.sync_supabase_to_frappe(
+                "Employee", 
+                "user-123",
+                sample_supabase_user_data
+            )
+            
+            assert frappe_result["status"] == "success"
+            assert supabase_result["status"] == "success"

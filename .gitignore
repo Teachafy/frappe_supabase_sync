@@ -6,6 +6,10 @@ __pycache__/
 # C extensions
 *.so
 
+# Development Files
+scripts/
+tests/
+
 # Distribution / packaging
 .Python
 build/
@@ -181,6 +185,7 @@ grafana_data/
 tmp/
 temp/
 .tmp/
+.temp/
 
 # Test files (but keep our actual test files)
 # test_*.py
