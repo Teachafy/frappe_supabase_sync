@@ -102,7 +102,7 @@ class FrappeClient:
                     logger.error("Failed to create document", doctype=doctype, data=data, error=str(e), response_body=response_body)
                 else:
                     logger.error("Failed to create document", doctype=doctype, data=data, error=str(e))
-            except:
+            except Exception as e:
                 logger.error("Failed to create document", doctype=doctype, data=data, error=str(e))
             raise
     

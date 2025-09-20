@@ -287,3 +287,4 @@ class SupabaseClient:
         except Exception as e:
             logger.error("Supabase health check failed", error=str(e))
             return False
+
