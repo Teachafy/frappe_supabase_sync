@@ -13,7 +13,7 @@ from src.utils.logger import setup_logging
 from src.handlers.frappe_webhook import FrappeWebhookHandler
 from src.handlers.supabase_webhook import SupabaseWebhookHandler
 from src.engine.sync_engine import SyncEngine
-from src.queue.sync_queue import SyncQueue
+from src.sync_queue_module.sync_queue import SyncQueue
 from src.monitoring.health import HealthChecker
 from src.monitoring.metrics import MetricsCollector
 from src.api.schema_api import router as schema_router
