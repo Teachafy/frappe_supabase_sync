@@ -173,10 +173,15 @@ jobs:
         docker build -t frappe-supabase-sync:test .
         # Test that the image can be created and basic functionality works
         echo "Testing Docker image build and basic functionality..."
+        # Test that the image can run a simple command
+        echo "Testing basic container functionality:"
+        docker run --rm frappe-supabase-sync:test python --version || echo "Python version check failed"
+        docker run --rm frappe-supabase-sync:test python -c "import src.config; print('Config import successful')" || echo "Config import failed"
 
     - name: Test Docker container startup
       run: |
-        # Run the container in background
+        # Run the container in background and capture output
+        echo "Starting container..."
         docker run --rm -d --name sync-test -p 8000:8000 \
           -e REDIS_URL=redis://localhost:6379/0 \
           -e FRAPPE_URL=http://test-frappe.com \
@@ -188,7 +193,7 @@ jobs:
           -e WEBHOOK_SECRET=test_webhook_secret \
           -e FRAPPE_WEBHOOK_TOKEN=test_token \
           -e LOG_LEVEL=INFO \
-          frappe-supabase-sync:test || echo "Container failed to start, checking logs..."
+          frappe-supabase-sync:test 2>&1 || echo "Container failed to start, checking logs..."
 
     - name: Check container status and logs
       run: |
@@ -198,15 +203,33 @@ jobs:
         echo "Container status:"
         docker ps -a | grep sync-test || echo "No sync-test container found"
         # Show logs if container exists
-        docker logs sync-test 2>&1 | tail -20 || echo "No logs available"
+        echo "Container logs:"
+        docker logs sync-test 2>&1 | tail -30 || echo "No logs available"
         # Check if port is listening
+        echo "Port status:"
         netstat -tlnp | grep :8000 || echo "Port 8000 not listening"
+        # Try to start container in foreground to see immediate errors
+        echo "Trying to start container in foreground to see errors:"
+        timeout 10s docker run --rm --name sync-test-foreground -p 8001:8000 \
+          -e REDIS_URL=redis://localhost:6379/0 \
+          -e FRAPPE_URL=http://test-frappe.com \
+          -e FRAPPE_API_KEY=test_key \
+          -e FRAPPE_API_SECRET=test_secret \
+          -e SUPABASE_URL=https://test.supabase.co \
+          -e SUPABASE_ANON_KEY=test_anon_key \
+          -e SUPABASE_SERVICE_ROLE_KEY=test_service_key \
+          -e WEBHOOK_SECRET=test_webhook_secret \
+          -e FRAPPE_WEBHOOK_TOKEN=test_token \
+          -e LOG_LEVEL=INFO \
+          frappe-supabase-sync:test 2>&1 || echo "Foreground container failed"
 
     - name: Cleanup
       if: always()
       run: |
         docker stop sync-test || true
         docker rm sync-test || true
+        docker stop sync-test-foreground || true
+        docker rm sync-test-foreground || true
 
   build:
     needs: [test]
