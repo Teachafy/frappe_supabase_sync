@@ -49,9 +49,9 @@ class ComplexMapper:
             elif mapping_type == "project_lookup":
                 return await self._handle_project_lookup(value, config, direction)
             elif mapping_type == "date_fallback":
-                return await self._handle_date_fallback_mapping(data, config, source_system, target_system)
+                return await self._handle_date_fallback_mapping(value, config, source_system, target_system)
             elif mapping_type == "default_value":
-                return await self._handle_default_value_mapping(data, config, source_system, target_system)
+                return await self._handle_default_value_mapping(value, config, source_system, target_system)
             elif mapping_type == "date_format_conversion":
                 return await self._handle_date_format_conversion(value, config, source_system, target_system)
             else:
