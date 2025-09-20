@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   sync-service:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     environment:
@@ -21,6 +23,39 @@ services:
       - redis
     volumes:
       - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  sync-service-dev:
+    build: 
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8001:8000"
+    environment:
+      - FRAPPE_URL=${FRAPPE_URL}
+      - FRAPPE_API_KEY=${FRAPPE_API_KEY}
+      - FRAPPE_API_SECRET=${FRAPPE_API_SECRET}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - REDIS_URL=redis://redis:6379/0
+      - WEBHOOK_SECRET_KEY=${WEBHOOK_SECRET_KEY}
+      - FRAPPE_WEBHOOK_TOKEN=${FRAPPE_WEBHOOK_TOKEN}
+      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      - ENABLE_METRICS=${ENABLE_METRICS:-true}
+    depends_on:
+      - redis
+    volumes:
+      - ./logs:/app/logs
+      - ./src:/app/src
+      - ./main.py:/app/main.py
+      - ./custom_mappings.json:/app/custom_mappings.json
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

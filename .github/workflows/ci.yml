@@ -14,6 +14,7 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       matrix:
         python-version: ['3.8', '3.9', '3.10', '3.11']
@@ -55,31 +56,42 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libpq-dev gcc
 
+    - name: Create virtual environment
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+        python -m pip install --upgrade pip
+
     - name: Install Python dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements-dev.txt
+        source venv/bin/activate
+        pip install --no-cache-dir --timeout 1000 -r requirements.txt
+        pip install --no-cache-dir --timeout 1000 -r requirements-dev.txt
 
     - name: Lint with flake8
       run: |
+        source venv/bin/activate
         flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
         flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
     - name: Format check with black
       run: |
+        source venv/bin/activate
         black --check src/ tests/
 
     - name: Import sorting check with isort
       run: |
+        source venv/bin/activate
         isort --check-only src/ tests/
 
     - name: Type check with mypy
       run: |
+        source venv/bin/activate
         mypy src/ --ignore-missing-imports
 
     - name: Security check with bandit
       run: |
+        source venv/bin/activate
         bandit -r src/ -f json -o bandit-report.json || true
 
     - name: Run unit tests
@@ -96,6 +108,7 @@ jobs:
         FRAPPE_WEBHOOK_TOKEN: test_token
         LOG_LEVEL: INFO
       run: |
+        source venv/bin/activate
         pytest tests/test_sync_components_unit.py tests/test_field_mapping.py tests/test_webhook_handlers.py --cov=src --cov-report=xml --cov-report=html --junitxml=pytest-report.xml -v
 
     - name: Run comprehensive tests
@@ -112,6 +125,7 @@ jobs:
         FRAPPE_WEBHOOK_TOKEN: ${{ secrets.FRAPPE_WEBHOOK_TOKEN || 'test_token' }}
         LOG_LEVEL: INFO
       run: |
+        source venv/bin/activate
         pytest tests/test_comprehensive_sync_issues.py --cov=src --cov-report=xml --cov-report=html --junitxml=pytest-report.xml -v
 
     - name: Upload coverage to Codecov
@@ -131,8 +145,52 @@ jobs:
           htmlcov/
           bandit-report.json
 
+  docker-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: false
+        tags: frappe-supabase-sync:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Test Docker image
+      run: |
+        docker run --rm -d --name sync-test -p 8000:8000 \
+          -e REDIS_URL=redis://localhost:6379/0 \
+          -e FRAPPE_URL=http://test-frappe.com \
+          -e FRAPPE_API_KEY=test_key \
+          -e FRAPPE_API_SECRET=test_secret \
+          -e SUPABASE_URL=https://test.supabase.co \
+          -e SUPABASE_ANON_KEY=test_anon_key \
+          -e SUPABASE_SERVICE_ROLE_KEY=test_service_key \
+          -e WEBHOOK_SECRET=test_webhook_secret \
+          -e FRAPPE_WEBHOOK_TOKEN=test_token \
+          -e LOG_LEVEL=INFO \
+          frappe-supabase-sync:test
+
+    - name: Wait for service to start
+      run: |
+        sleep 10
+        curl -f http://localhost:8000/health || exit 1
+
+    - name: Cleanup
+      if: always()
+      run: |
+        docker stop sync-test || true
+        docker rm sync-test || true
+
   build:
-    needs: test
+    needs: [test, docker-test]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
@@ -172,6 +230,9 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
     steps:
     - uses: actions/checkout@v4
 
@@ -190,10 +251,9 @@ jobs:
         sarif_file: 'trivy-results.sarif'
 
   deploy:
-    needs: [test, build]
+    needs: [test, docker-test, build]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment: production
 
     steps:
     - uses: actions/checkout@v4
