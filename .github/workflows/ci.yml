@@ -47,7 +47,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'requirements-ci.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
 
@@ -63,11 +63,20 @@ jobs:
         python -m pip install --upgrade pip
 
     - name: Install Python dependencies
+      timeout-minutes: 15
       run: |
         source venv/bin/activate
-        pip install --no-cache-dir --timeout 1000 --upgrade pip setuptools wheel
-        pip install --no-cache-dir --timeout 1000 -r requirements.txt
-        pip install --no-cache-dir --timeout 1000 -r requirements-dev.txt || pip install --no-cache-dir --timeout 1000 --force-reinstall -r requirements-dev.txt
+        # Upgrade pip first
+        pip install --upgrade pip setuptools wheel
+        # Install core dependencies with retry
+        pip install --timeout 300 -r requirements.txt || pip install --timeout 300 --retries 3 -r requirements.txt
+        # Install minimal CI dependencies only
+        pip install --timeout 300 -r requirements-ci.txt || pip install --timeout 300 --retries 3 -r requirements-ci.txt
+        
+    - name: Verify installation
+      run: |
+        source venv/bin/activate
+        python -c "import pytest, black, flake8, isort; print('Essential packages installed successfully')"
 
     - name: Lint with flake8
       run: |
