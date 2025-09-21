@@ -5,8 +5,12 @@ import pytest
 import asyncio
 import json
 import os
+import warnings
 from unittest.mock import Mock, AsyncMock, patch
 from typing import Dict, Any, List
+
+# Suppress multipart deprecation warning
+warnings.filterwarnings("ignore", message="Please use `import python_multipart` instead.", category=PendingDeprecationWarning)
 
 # Add the src directory to the path
 import sys

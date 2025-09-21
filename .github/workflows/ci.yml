@@ -253,6 +253,9 @@ jobs:
         # Check if port is listening
         echo "Port status:"
         netstat -tlnp | grep :8000 || echo "Port 8000 not listening"
+        # Test health endpoint
+        echo "Testing health endpoint:"
+        curl -f http://localhost:8000/health || echo "Health check failed (expected with test credentials)"
         # Try to start container in foreground to see immediate errors
         echo "Trying to start container in foreground to see errors:"
         timeout 10s docker run --rm --name sync-test-foreground -p 8001:8000 \
@@ -268,7 +271,7 @@ jobs:
           -e FRAPPE_WEBHOOK_TOKEN=test_token \
           -e LOG_LEVEL=INFO \
           -e ENVIRONMENT=test \
-          frappe-supabase-sync:test 2>&1 || echo "Foreground container failed"
+          frappe-supabase-sync:test 2>&1 || echo "Foreground container failed (expected with test credentials)"
 
     - name: Cleanup
       if: always()
