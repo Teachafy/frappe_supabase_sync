@@ -1,9 +1,7 @@
-# Minimal requirements for CI - only essential dependencies
+# Ultra-minimal requirements for CI - only absolutely essential dependencies
 # Core Testing Dependencies
 pytest==8.4.2
 pytest-asyncio==1.2.0
-pytest-cov==7.0.0
-pytest-mock==3.15.1
 
 # Code Quality (minimal set)
 black==25.9.0
@@ -13,8 +11,3 @@ isort==6.0.1
 # Testing Utilities (minimal)
 factory-boy==3.3.3
 faker==37.8.0
-responses==0.25.8
-
-# Database Testing (minimal)
-pytest-postgresql==7.0.2
-pytest-redis==3.1.3
