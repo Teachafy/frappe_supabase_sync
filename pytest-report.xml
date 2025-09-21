@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="0.362" timestamp="2025-09-21T18:33:00.984173+05:30" hostname="buddywhitman"><testcase classname="tests.test_comprehensive_sync_issues.TestComprehensiveSyncIssues" name="test_frappe_employee_create_to_supabase" time="0.088"><failure message="AttributeError: 'TestComprehensiveSyncIssues' object has no attribute 'frappe_client'">self = &lt;tests.test_comprehensive_sync_issues.TestComprehensiveSyncIssues object at 0x000001F083A43750&gt;
+
+    @pytest.mark.asyncio
+    async def test_frappe_employee_create_to_supabase(self):
+        """Test: Frappe Employee CREATE → Supabase User"""
+        # Create employee in Frappe
+&gt;       frappe_emp = await self.frappe_client.create_document("Employee", self.test_employee_data)
+                           ^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'TestComprehensiveSyncIssues' object has no attribute 'frappe_client'
+
+tests\test_comprehensive_sync_issues.py:337: AttributeError</failure></testcase></testsuite></testsuites>

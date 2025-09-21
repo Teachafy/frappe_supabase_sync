@@ -108,6 +108,7 @@ jobs:
         python -c "import black; print('black: OK')" || echo "black: FAILED"
         python -c "import flake8; print('flake8: OK')" || echo "flake8: FAILED"
         python -c "import isort; print('isort: OK')" || echo "isort: FAILED"
+        python -c "import pytest_cov; print('pytest-cov: OK')" || echo "pytest-cov: FAILED (will use fallback)"
         echo "Verification completed"
 
     - name: Lint with flake8
@@ -142,7 +143,8 @@ jobs:
       if: matrix.test-type == 'unit'
       run: |
         source venv/bin/activate
-        pytest tests/test_sync_components_unit.py tests/test_field_mapping.py tests/test_webhook_handlers.py --cov=src --cov-report=xml --cov-report=html --junitxml=pytest-report.xml -v
+        # Try with coverage, fallback to basic pytest if coverage not available
+        pytest tests/test_sync_components_unit.py tests/test_field_mapping.py tests/test_webhook_handlers.py --cov=src --cov-report=xml --cov-report=html --junitxml=pytest-report.xml -v || pytest tests/test_sync_components_unit.py tests/test_field_mapping.py tests/test_webhook_handlers.py --junitxml=pytest-report.xml -v
 
     - name: Run comprehensive tests
       if: matrix.test-type == 'comprehensive'
@@ -159,7 +161,8 @@ jobs:
         LOG_LEVEL: INFO
       run: |
         source venv/bin/activate
-        pytest tests/test_comprehensive_sync_issues.py --cov=src --cov-report=xml --cov-report=html --junitxml=pytest-report.xml -v
+        # Try with coverage, fallback to basic pytest if coverage not available
+        pytest tests/test_comprehensive_sync_issues.py --cov=src --cov-report=xml --cov-report=html --junitxml=pytest-report.xml -v || pytest tests/test_comprehensive_sync_issues.py --junitxml=pytest-report.xml -v
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
