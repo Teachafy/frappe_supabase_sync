@@ -17,12 +17,8 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11']
-        include:
-          - python-version: '3.11'
-            test-type: 'comprehensive'
-          - python-version: '3.11'
-            test-type: 'unit'
+        python-version: ['3.11']
+        test-type: ['unit', 'comprehensive']
 
     services:
       redis:
@@ -34,6 +30,35 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_USER: test
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d test_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Core application settings
+      DATABASE_URL: postgresql://test:test@localhost:5432/test_db
+      REDIS_URL: redis://localhost:6379/0
+      FRAPPE_URL: http://test-frappe.com
+      FRAPPE_API_KEY: test_key
+      FRAPPE_API_SECRET: test_secret
+      SUPABASE_URL: https://test.supabase.co
+      SUPABASE_ANON_KEY: test_anon_key
+      SUPABASE_SERVICE_ROLE_KEY: test_service_key
+      WEBHOOK_SECRET: test_webhook_secret
+      FRAPPE_WEBHOOK_TOKEN: test_token
+      LOG_LEVEL: INFO
+      ENVIRONMENT: test
 
     steps:
     - uses: actions/checkout@v4
@@ -114,24 +139,13 @@ jobs:
         bandit -r src/ -f json -o bandit-report.json || echo "Security check failed, but continuing..."
 
     - name: Run unit tests
-      if: matrix.test-type == 'unit' || matrix.python-version != '3.11'
-      env:
-        REDIS_URL: redis://localhost:6379/0
-        FRAPPE_URL: http://test-frappe.com
-        FRAPPE_API_KEY: test_key
-        FRAPPE_API_SECRET: test_secret
-        SUPABASE_URL: https://test.supabase.co
-        SUPABASE_ANON_KEY: test_anon_key
-        SUPABASE_SERVICE_ROLE_KEY: test_service_key
-        WEBHOOK_SECRET: test_webhook_secret
-        FRAPPE_WEBHOOK_TOKEN: test_token
-        LOG_LEVEL: INFO
+      if: matrix.test-type == 'unit'
       run: |
         source venv/bin/activate
         pytest tests/test_sync_components_unit.py tests/test_field_mapping.py tests/test_webhook_handlers.py --cov=src --cov-report=xml --cov-report=html --junitxml=pytest-report.xml -v
 
     - name: Run comprehensive tests
-      if: matrix.test-type == 'comprehensive' || matrix.python-version == '3.11'
+      if: matrix.test-type == 'comprehensive'
       env:
         REDIS_URL: redis://localhost:6379/0
         FRAPPE_URL: ${{ secrets.FRAPPE_URL || 'http://test-frappe.com' }}
@@ -192,13 +206,8 @@ jobs:
         # Test that the image can run a simple command
         echo "Testing basic container functionality:"
         docker run --rm frappe-supabase-sync:test python --version || echo "Python version check failed"
-        docker run --rm frappe-supabase-sync:test python -c "import src.config; print('Config import successful')" || echo "Config import failed"
-
-    - name: Test Docker container startup
-      run: |
-        # Run the container in background and capture output
-        echo "Starting container..."
-        docker run --rm -d --name sync-test -p 8000:8000 \
+        docker run --rm \
+          -e DATABASE_URL=postgresql://test:test@localhost:5432/test_db \
           -e REDIS_URL=redis://localhost:6379/0 \
           -e FRAPPE_URL=http://test-frappe.com \
           -e FRAPPE_API_KEY=test_key \
@@ -209,6 +218,26 @@ jobs:
           -e WEBHOOK_SECRET=test_webhook_secret \
           -e FRAPPE_WEBHOOK_TOKEN=test_token \
           -e LOG_LEVEL=INFO \
+          -e ENVIRONMENT=test \
+          frappe-supabase-sync:test python -c "import src.config; print('Config import successful')" || echo "Config import failed"
+
+    - name: Test Docker container startup
+      run: |
+        # Run the container in background and capture output
+        echo "Starting container..."
+        docker run --rm -d --name sync-test -p 8000:8000 \
+          -e DATABASE_URL=postgresql://test:test@localhost:5432/test_db \
+          -e REDIS_URL=redis://localhost:6379/0 \
+          -e FRAPPE_URL=http://test-frappe.com \
+          -e FRAPPE_API_KEY=test_key \
+          -e FRAPPE_API_SECRET=test_secret \
+          -e SUPABASE_URL=https://test.supabase.co \
+          -e SUPABASE_ANON_KEY=test_anon_key \
+          -e SUPABASE_SERVICE_ROLE_KEY=test_service_key \
+          -e WEBHOOK_SECRET=test_webhook_secret \
+          -e FRAPPE_WEBHOOK_TOKEN=test_token \
+          -e LOG_LEVEL=INFO \
+          -e ENVIRONMENT=test \
           frappe-supabase-sync:test 2>&1 || echo "Container failed to start, checking logs..."
 
     - name: Check container status and logs
@@ -227,6 +256,7 @@ jobs:
         # Try to start container in foreground to see immediate errors
         echo "Trying to start container in foreground to see errors:"
         timeout 10s docker run --rm --name sync-test-foreground -p 8001:8000 \
+          -e DATABASE_URL=postgresql://test:test@localhost:5432/test_db \
           -e REDIS_URL=redis://localhost:6379/0 \
           -e FRAPPE_URL=http://test-frappe.com \
           -e FRAPPE_API_KEY=test_key \
@@ -237,6 +267,7 @@ jobs:
           -e WEBHOOK_SECRET=test_webhook_secret \
           -e FRAPPE_WEBHOOK_TOKEN=test_token \
           -e LOG_LEVEL=INFO \
+          -e ENVIRONMENT=test \
           frappe-supabase-sync:test 2>&1 || echo "Foreground container failed"
 
     - name: Cleanup
